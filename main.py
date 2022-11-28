@@ -1,4 +1,4 @@
-#from sched import schedule
+import json
 import schedule
 import smtplib
 import requests
@@ -6,12 +6,14 @@ from requests.sessions import Session
 import time
 from bs4 import BeautifulSoup
 from datetime import datetime, date, timedelta
-
 import smtplib, ssl
+
+#init in main method
+sender_email = ""
+email_password = ""
 
 
 class Account:
-    
     def __init__(self, email, password) -> None:
         self.data =  {
   '__EVENTTARGET': '',
@@ -45,50 +47,50 @@ def getCurrentDateTime():
     date = t.strftime('%y-%m-%d')
     return date
 
-def send_mail(message):
+#Sends mails to all mail specified in mail.json
+#@Params message: message that will be sent  
+def send_mail(message: str):
     try:
-        sender_email = "bastuklubbenparran@gmail.com"
-        password = "password"
-        receiver = "temp"
-        receivers = ["temp", "temp"]
+        receivers = []
+        mails = read_json('mail.json')
+        for mail in mails:
+            receivers.append(mail.get("email"))
         context = ssl.create_default_context()
         with smtplib.SMTP_SSL("smtp.gmail.com", port=465, context=context) as server:
-            server.login(sender_email, password)
+            server.login(sender_email, email_password)
             server.sendmail(sender_email, receivers, message)
     
-        
     except Exception as e:
         # Print any error messages to stdout
         print(e)
 
+#Tries to book the sauna
 def tryBook(s, token, time, name):
-
     params = (
     ('Token', token),
-    ('StartTimestamp','20'+ time + 'T08:00'),
+    ('StartTimestamp','20'+ time + 'T11:00'),
     ('LengthMinutes', '180'),
     ('GroupId', '33'),
     ('MaxWaitSeconds', '60'),
 )
-    print(params)
-
     response = s.get('https://aptusbookingservice.afbostader.se/bookingservice.svc/Book', params=params)
     print(response.json())
     try:
-        print(params[1])
-        message = """
-        Sauna booked at """ + str(params[1])+ """, by """ + name + """
-        """
+        print(str(params[1]))
         if response.json()['UnBookable']:
+            message = """
+            Sauna booked at """ + str(params[1])+ """, by """ + name + """
+            """
             print('success')
-        send_mail(message)
+            send_mail(message)
         
             
     except Exception as e:
         message = """
         Sauna could not be booked at """ + str(params[1])+ """, by """ + name + """.\n\n error: """ + str(e) + """
         """
-        send_mail(message)
+        #send_mail(message)
+        print(e)
         
 #Finds date in x number of weeks
 def findTime(nbr_weeks):
@@ -111,39 +113,42 @@ def getToken(s):
         return value
     except Exception as e:
         print("Got unhandled exception %s" % str(e))
-    #mydivs = soup.find_all("div", {"class": "price-ticket__fluctuations"})
 
 
 def job():
-    name = 'temp'
-    Py = Account(name, 'temp')
-    s = Py.login()
-    token = getToken(s)
-    next_time = findTime(1)
+    accounts = read_json('accounts.json')
+    for acc in accounts:
+        name = acc.get("email")
+        password = acc.get("password")
+        Py = Account(name, password)
+        s = Py.login()
+        token = getToken(s)
 
-    tryBook(s, token, next_time, name)
+        for i in range(len(accounts)):
+            next_time = findTime(i+1)
+            tryBook(s, token, next_time, name)
 
 def main():
     print('called')
-    schedule.every().sunday.at("23:30").do(job)
-    Py = Account('temp', 'temp')
-    s = Py.login()
-    token = getToken(s)
-    next_date = findTime(1)
-    print(next_date)
-    tryBook(s, token, '22-12-03', "Hampus")    
+    schedule.every().sunday.at("23:45").do(job)   
 
     while True:
         schedule.run_pending()
-        time.sleep(59)
+        time.sleep(55)
 
 
-#def notifyy():
-    #gm = gmail()
-    #gm.notify()
+def read_json(file_name):
+    f = open(file_name)
+    data = json.load(f)
+    result = []
+    for i in data:
+        result.append(i) 
+    f.close()
+    return result
 
 if __name__ == "__main__":
-    send_mail("Server running")
+    sender_email = ""
+    email_password = ""
     main()
 
     
