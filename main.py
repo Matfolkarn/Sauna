@@ -6,7 +6,9 @@ from requests.sessions import Session
 import time
 from bs4 import BeautifulSoup
 from datetime import datetime, date, timedelta
+
 import smtplib, ssl
+
 
 #init in main method
 sender_email = ""
@@ -64,6 +66,7 @@ def send_mail(message: str):
         # Print any error messages to stdout
         print(e)
 
+global dates
 #Tries to book the sauna
 def tryBook(s, token, time, name):
     params = (
@@ -76,20 +79,18 @@ def tryBook(s, token, time, name):
     response = s.get('https://aptusbookingservice.afbostader.se/bookingservice.svc/Book', params=params)
     print(response.json())
     try:
-        print(str(params[1]))
         if response.json()['UnBookable']:
+            dates.append(str(params[1]).replace("('StartTimestamp', '","").replace("')","").replace("T","-"))
             message = """
             Sauna booked at """ + str(params[1])+ """, by """ + name + """
             """
             print('success')
-            send_mail(message)
-        
-            
+        print(dates)    
+    
     except Exception as e:
         message = """
         Sauna could not be booked at """ + str(params[1])+ """, by """ + name + """.\n\n error: """ + str(e) + """
         """
-        #send_mail(message)
         print(e)
         
 #Finds date in x number of weeks
@@ -114,8 +115,19 @@ def getToken(s):
     except Exception as e:
         print("Got unhandled exception %s" % str(e))
 
+def remove_old_dates_from_dates():
+    result = []
+    today = datetime.today()
+    global dates
+    for date in dates:
+        date = date.replace(' ', '-').replace(':','-')
+        date = date.split('-') 
+        date = datetime(int(date[0]), int(date[1]), int(date[2]), int(date[3]), int(date[4]))
+        if date > today:
+            result.append(str(date))
+    dates = result
 
-def job():
+def job_1():
     accounts = read_json('accounts.json')
     for acc in accounts:
         name = acc.get("email")
@@ -128,9 +140,31 @@ def job():
             next_time = findTime(i+1)
             tryBook(s, token, next_time, name)
 
+def job_2():
+    
+
+    remove_old_dates_from_dates()
+
+    result = ""
+
+    for x in dates:
+        result = result + x + "\n"
+    message = """
+    Good monday!
+    \nThis is the schedule for the bastuklubben: \n""" + result + """  
+    """
+
+    if len(dates) == 0:
+        message = """
+        The sauna is not booked :(
+        """
+
+    send_mail(message)
+
 def main():
     print('called')
-    schedule.every().sunday.at("23:45").do(job)   
+    schedule.every().sunday.at("23:45").do(job_1)   
+    schedule.every().monday.at("12:00").do(job_2)
 
     while True:
         schedule.run_pending()
@@ -147,6 +181,7 @@ def read_json(file_name):
     return result
 
 if __name__ == "__main__":
+    dates = []
     sender_email = ""
     email_password = ""
     main()
