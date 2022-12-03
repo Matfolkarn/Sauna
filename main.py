@@ -8,6 +8,7 @@ from bs4 import BeautifulSoup
 from datetime import datetime, date, timedelta
 
 import smtplib, ssl
+import wash
 
 
 #init in main method
@@ -161,8 +162,18 @@ def job_2():
 
     send_mail(message)
 
+def job_wash():
+    acc = read_json('washingAccounts.json')
+    print(acc[0])
+    name = acc[0].get("email")
+    password = acc[0].get("password")
+    next_date = findTime(1)
+    wash.wash(name, password, next_date)
+
+
 def main():
     print('called')
+    schedule.every().sunday.at("23:30").do(job_wash)
     schedule.every().sunday.at("23:45").do(job_1)   
     schedule.every().monday.at("12:00").do(job_2)
 
